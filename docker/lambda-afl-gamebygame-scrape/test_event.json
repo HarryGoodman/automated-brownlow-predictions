@@ -1,0 +1,5 @@
+{
+    "bucket_to_save" : "afl-game-data", 
+    "data_path" : "data/player-gamebygame/AFL-Tables_game-by-game-stats_",
+    "year_to_query" : 2023
+}

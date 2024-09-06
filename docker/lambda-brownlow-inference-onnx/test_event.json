@@ -1,0 +1,9 @@
+{
+    "bucket_to_save" : "afl-game-data", 
+    "data_path" : "data/player-gamebygame/AFL-Tables_game-by-game-stats_",
+    "model_path": "models/brownlow_player_single-game/afl_brownlow_player_single-game.onnx",
+    "year_to_query" : 2012,
+    "region_name" : "ap-southeast-2",
+    "table_name" : "afl-brownlow-vote-predictions",
+    "projection_expression" : "YearRound"  
+}
