@@ -55,7 +55,7 @@ class ScheduledLambdaStack(Stack):
                 "dynamodb:BatchWriteItem",
                 "dynamodb:BatchGetItem"
             ],
-            resources=["*"]  # Adjust this if you want to restrict access to specific DynamoDB tables
+            resources=["*"]  
         ))
 
         lambda_role.add_to_policy(aws_iam.PolicyStatement(
@@ -66,13 +66,12 @@ class ScheduledLambdaStack(Stack):
                 "logs:PutLogEvents",
                 "logs:DescribeLogStreams"
             ],
-            resources=["*"]  # Adjust this if you want to restrict access to specific Log Groups
+            resources=["*"]  
         ))
 
-        # Reference the ECR repository correctly for Brownlow Inference
         ecr_repository_inference = aws_ecr.Repository.from_repository_name(self, "ECRRepoInference", "lambda-brownlow-inference-onnx")
 
-        # Define the Lambda function for Brownlow Inference using a Docker image
+        # Define the Lambda function for Brownlow Inference using a Docker image 
         lambda_inference_fn = aws_lambda.DockerImageFunction(self, "BrownlowInference",
             function_name="brownlow-inference",
             description="Scheduled Lambda using Docker Image for Brownlow Inference",
@@ -108,7 +107,6 @@ class ScheduledLambdaStack(Stack):
             })
         ))
 
-        # Reference the correct ECR repository for Brownlow Scrape
         ecr_repository_scrape = aws_ecr.Repository.from_repository_name(self, "ECRRepoScrape", "afl-gamebygame-scrape")
 
         # Define the Lambda function for Brownlow Scrape using the correct Docker image

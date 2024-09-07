@@ -7,11 +7,9 @@ import pyarrow.parquet as pq
 import boto3
 from bs4 import BeautifulSoup
 
-# Set up logging
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
-# Function to scrape AFL game-by-game stats
 def get_game_by_game_stats(year: int = 2021) -> pd.DataFrame:
     """Retrieves the detailed game-by-game AFL player statistics for a year."""
     min_year, max_year = 1965, 2025
@@ -60,7 +58,6 @@ def get_game_by_game_stats(year: int = 2021) -> pd.DataFrame:
                 else:
                     gbg_content[table_content[0]][table_name] = table_content[1:-1]
 
-    # Turn the data into pandas DataFrame
     for key, values in gbg_content.items():
         if "df" not in locals():
             df = pd.DataFrame.from_dict(values)
@@ -82,10 +79,8 @@ def get_game_by_game_stats(year: int = 2021) -> pd.DataFrame:
         var_name="stat",
     ).reset_index()
 
-# Lambda handler
 def lambda_handler(event, context):
     try:
-        # Extract parameters from the event
         year_to_query = event['year_to_query']
         bucket_name = event['bucket_to_save']
         data_path = event['data_path']
@@ -93,17 +88,13 @@ def lambda_handler(event, context):
 
         logger.info(f"Fetching game-by-game stats for year {year_to_query}")
 
-        # Fetch game stats
         df = get_game_by_game_stats(year=year_to_query)
 
-        # Convert DataFrame to Parquet format in memory
         buffer = BytesIO()
         pq.write_table(pa.Table.from_pandas(df), buffer)
 
-        # Set up the S3 client
         s3_client = boto3.client('s3')
 
-        # Upload the Parquet file to S3
         s3_client.put_object(
             Bucket=bucket_name,
             Key=data_path,
