@@ -1,58 +1,43 @@
+# AFL Brownlow Vote Prediction - Scheduled Lambda Functions
 
-# Welcome to your CDK Python project!
+This AWS CDK app provisions the infrastructure for scheduling two AWS Lambda functions that handle AFL game data scraping and Brownlow vote predictions. These Lambda functions are triggered automatically by EventBridge rules and use Docker images for execution.
 
-This is a blank project for CDK development with Python.
+## Overview
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+The CDK app sets up the following:
+- **Lambda Functions**:
+  - **Data Scraping**: Scrapes AFL game statistics weekly.
+  - **Vote Prediction**: Runs an ONNX model to predict Brownlow votes for each game, based on the data scraped.
+- **EventBridge Rules**: Schedules the Lambda functions to run weekly.
+- **ECR Repositories**: Retrieves Docker images for Lambda functions that handle scraping and inference tasks.
 
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
+## CDK Stacks
 
-To manually create a virtualenv on MacOS and Linux:
+- **`ScheduledLambdaStack`**: Defines the infrastructure for both scheduled Lambda functions, their permissions, and the EventBridge rules for triggering them.
 
-```
-$ python3 -m venv .venv
-```
+### Lambda Functions
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+1. **Brownlow Inference**: 
+   - Function name: `brownlow-inference`
+   - **Docker Image**: Hosted in Amazon ECR and used to run the ONNX model for vote prediction.
+   - **Triggered by**: An EventBridge rule that runs the function weekly.
+   - **Permissions**: S3 access for retrieving game data, DynamoDB access for storing predictions, and CloudWatch Logs for logging.
 
-```
-$ source .venv/bin/activate
-```
+2. **Brownlow Scrape**:
+   - Function name: `brownlow-scrape`
+   - **Docker Image**: Used to scrape AFL game data weekly.
+   - **Triggered by**: An EventBridge rule that runs the function weekly.
+   - **Permissions**: S3 access for storing scraped game data and CloudWatch Logs for logging.
 
-If you are a Windows platform, you would activate the virtualenv like this:
+### EventBridge Rules
 
-```
-% .venv\Scripts\activate.bat
-```
+- **`brownlow-inference-weekly`**: Runs the `brownlow-inference` Lambda function weekly to generate vote predictions based on the latest game data.
+- **`brownlow-scrape-weekly`**: Runs the `brownlow-scrape` Lambda function weekly to scrape the latest AFL game data.
 
-Once the virtualenv is activated, you can install the required dependencies.
+## Deployment
 
-```
-$ pip install -r requirements.txt
-```
+### Prerequisites
 
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
-```
-
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
-
-## Useful commands
-
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
-
-Enjoy!
+- AWS CDK installed (`npm install -g aws-cdk`)
+- AWS account with necessary permissions
+- Python3 installed for CDK
