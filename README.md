@@ -21,3 +21,11 @@ This project automates the prediction of AFL Brownlow votes using a combination 
 - **`brownlow-votes-dynamodb/`**: Contains the CDK stack responsible for provisioning the DynamoDB table where Brownlow vote predictions and game data are stored.
 
 Each folder includes its own `README.md` file. 
+
+## Infrastructure Diagram
+
+The following diagram provides an overview of the AWS infrastructure used in the AFL Brownlow Vote Prediction system:
+
+![Automated Brownlow Prediction Infrastructure](infrastructure-diagrams/automated-brownlow-prediction-infastructure.png)
+
+This diagram illustrates the key AWS services involved, including Lambda functions, S3 for data storage, DynamoDB for predictions, and EventBridge for scheduling the tasks. The Dockerized Lambda functions are hosted in Amazon ECR and are triggered weekly to scrape game data and run predictions.
