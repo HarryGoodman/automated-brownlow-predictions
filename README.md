@@ -20,4 +20,4 @@ This project automates the prediction of AFL Brownlow votes using a combination 
 - **`scheduled-lambda/`**: Contains the CDK stack responsible for creating the scheduled Lambda functions and EventBridge rules.
 - **`brownlow-votes-dynamodb/`**: Contains the CDK stack responsible for provisioning the DynamoDB table where Brownlow vote predictions and game data are stored.
 
-Each folder includes its own `README.md` file with detailed instructions on setup, deployment, and usage.
+Each folder includes its own `README.md` file. 
