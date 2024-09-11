@@ -1,9 +1,13 @@
+import aws_cdk as cdk
 from aws_cdk import (
     Stack,
     aws_dynamodb,
-    CfnOutput  # Import CfnOutput explicitly
+    aws_lambda,
+    aws_apigateway,
+    CfnOutput
 )
 from constructs import Construct
+from aws_cdk.aws_iam import PolicyStatement
 
 class BrownlowVotesDynamodbStack(Stack):
     def __init__(self, scope: Construct, id: str, **kwargs) -> None:
@@ -37,7 +41,38 @@ class BrownlowVotesDynamodbStack(Stack):
             read_capacity=5,
             write_capacity=5
         )
-        
+
+        # Create Lambda function from external file
+        leaderboard_lambda = aws_lambda.Function(self, "LeaderboardLambda",
+            runtime=aws_lambda.Runtime.PYTHON_3_9,
+            handler="leaderboard_lambda.handler",  # Handler function
+            code=aws_lambda.Code.from_asset("lambda"), 
+            timeout=cdk.Duration.minutes(15),
+            memory_size=1024,# Path to lambda function folder
+        )
+
+        # Grant DynamoDB read permissions to the Lambda
+        leaderboard_lambda.add_to_role_policy(
+            PolicyStatement(
+                actions=["dynamodb:Scan", "dynamodb:Query"],
+                resources=[ddb_table.table_arn]
+            )
+        )
+
+        # Create API Gateway
+        api = aws_apigateway.LambdaRestApi(self, "LeaderboardAPI",
+            handler=leaderboard_lambda,
+            proxy=False
+        )
+
+        # Create a specific resource for the leaderboard query
+        leaderboard_resource = api.root.add_resource("leaderboard")
+        leaderboard_resource.add_method("GET")  # Allow GET requests
+
+        # Output the API endpoint
+        CfnOutput(self, 'LeaderboardAPIUrl', value=api.url,
+            export_name=f'{self.stack_name}-LeaderboardAPIUrl')
+
         # Output the table name
         CfnOutput(self, 'DynamoDBTableName', value=ddb_table.table_name,
             export_name=f'{self.stack_name}-TableName')

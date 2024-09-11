@@ -116,6 +116,9 @@ def lambda_handler(event, context):
     bucket_name = event['bucket_to_save']
     data_path = event['data_path']
     data_path = f'{data_path}{str(year_to_query)}.parquet'
+    
+    # Check if 'run_all' parameter is specified
+    run_all = event.get('run_all', False)
 
     # DynamoDB params
     region_name = event['region_name']
@@ -163,64 +166,75 @@ def lambda_handler(event, context):
     else:
         max_round_inferenced = max(rounds_in_year, default=0)
 
-    # Continue with your code only if you have rounds to infer on
-    if max_round_inferenced + 1 in df['round'].unique():
-        df = df.loc[df['round'] == max_round_inferenced + 1]
+    # If run_all is True, infer for all rounds; otherwise infer only for the next round
+    if run_all:
+        df_to_infer = df  # Use all rounds
+        logger.info("Running inference for all rounds.")
+    else:
+        if max_round_inferenced + 1 in df['round'].unique():
+            df_to_infer = df.loc[df['round'] == max_round_inferenced + 1]  # Infer for the next round
+            logger.info(f"Running inference for round {max_round_inferenced + 1}.")
+        else:
+            logger.warning(f"No data found for round {max_round_inferenced + 1}. No inference will be done.")
+            return {
+                'statusCode': 200,
+                'body': f"No new rounds available to process. Max round inferred: {max_round_inferenced}."
+            }
 
-        # Fetch model from S3
-        logger.info(f"Fetching model from bucket: {bucket_name}, path: {model_path}")
-        logger.info(f"Round to inference on: {str(max_round_inferenced + 1)}")
-        response = s3_client.get_object(Bucket=bucket_name, Key=model_path)
-        onnx_model_bytes = response['Body'].read()
+    # Fetch model from S3
+    logger.info(f"Fetching model from bucket: {bucket_name}, path: {model_path}")
+    response = s3_client.get_object(Bucket=bucket_name, Key=model_path)
+    onnx_model_bytes = response['Body'].read()
 
-        # Load ONNX model using ONNX Runtime
-        onnx_session = onnxruntime.InferenceSession(onnx_model_bytes)
+    # Load ONNX model using ONNX Runtime
+    onnx_session = onnxruntime.InferenceSession(onnx_model_bytes)
 
-        # Ensure only existing columns are dropped, allowing 'brownlow_votes' to be missing
-        columns_to_drop = ['player', 'team', 'opponents', 'round', 'year', 'brownlow_votes', 'game_id', 'year_round']
-        missing_columns = [col for col in columns_to_drop if col not in df.columns and col != 'brownlow_votes']
+    # Ensure only existing columns are dropped, allowing 'brownlow_votes' to be missing
+    columns_to_drop = ['player', 'team', 'opponents', 'round', 'year', 'brownlow_votes', 'game_id', 'year_round']
+    missing_columns = [col for col in columns_to_drop if col not in df_to_infer.columns and col != 'brownlow_votes']
 
-        if missing_columns:
-            raise KeyError(f"Columns not found in DataFrame: {missing_columns}")
+    if missing_columns:
+        raise KeyError(f"Columns not found in DataFrame: {missing_columns}")
 
-        X_test = df.drop(columns=[col for col in columns_to_drop if col in df.columns])
-        X_test = X_test.astype(np.float32)
-        X_test = X_test.to_numpy()
+    X_test = df_to_infer.drop(columns=[col for col in columns_to_drop if col in df_to_infer.columns])
+    X_test = X_test.astype(np.float32)
+    X_test = X_test.to_numpy()
 
-        # Perform inference using ONNX Runtime
-        inf = []
-        for x in X_test:
-            t = onnx_session.run(None, {'input': x.reshape(1, -1)})
-            inf.append(float(t[0]))
+    # Perform inference using ONNX Runtime
+    inf = []
+    for x in X_test:
+        t = onnx_session.run(None, {'input': x.reshape(1, -1)})
+        inf.append(float(t[0]))
 
-        # Predict Brownlow
-        df['game_weight'] = inf
-        df['model'] = model_path
+    # Predict Brownlow
+    df_to_infer['game_weight'] = inf
+    df_to_infer['model'] = model_path
 
-        games = []
-        for game in df.groupby('game_id'):
-            game_df = game[1].nlargest(n=3, columns='game_weight')
-            game_df['votes'] = [3, 2, 1]
-            games.append(game_df)
-        votes_df = pd.concat(games, axis=0)
+    games = []
+    for game in df_to_infer.groupby('game_id'):
+        game_df = game[1].nlargest(n=3, columns='game_weight')
+        game_df['votes'] = [3, 2, 1]
+        games.append(game_df)
+    votes_df = pd.concat(games, axis=0)
 
-        for index, row in votes_df.iterrows():
-            item = {k: str(row[v]) if pd.notnull(row[v]) else None for k, v in ExportColumns.items()}
-            item = {k: v for k, v in item.items() if v is not None}
+    for index, row in votes_df.iterrows():
+        item = {k: str(row[v]) if pd.notnull(row[v]) else None for k, v in ExportColumns.items()}
+        item = {k: v for k, v in item.items() if v is not None}
 
-            # Create a unique identifier for the HashKey using multiple attributes
-            unique_identifier = f"{row[ExportColumns['Player']]}_{row[ExportColumns['Round']]}_{row[ExportColumns['Year']]}_{row[ExportColumns['GameID']]}"
-            item[projection_expression] = str(hashlib.sha256(unique_identifier.encode()).hexdigest())
-            item['Model'] = model_path  # Assuming model_path or a similar value is used as the Model attribute
+        # Create a unique identifier for the HashKey using multiple attributes
+        unique_identifier = f"{row[ExportColumns['Player']]}_{row[ExportColumns['Round']]}_{row[ExportColumns['Year']]}_{row[ExportColumns['GameID']]}"
+        item[projection_expression] = str(hashlib.sha256(unique_identifier.encode()).hexdigest())
+        item['Model'] = model_path  # Assuming model_path or a similar value is used as the Model attribute
 
-            # Log the item and its keys to ensure correctness
-            logger.info(f"Item to insert: {item}")
-            logger.info(f"Keys in item: {list(item.keys())}")
+        # Log the item and its keys to ensure correctness
+        logger.info(f"Item to insert: {item}")
+        logger.info(f"Keys in item: {list(item.keys())}")
 
-            # Put the item into DynamoDB
-            table.put_item(Item=item)
+        # Put the item into DynamoDB
+        table.put_item(Item=item)
 
     return {
         'statusCode': 200,
         'body': 'Lambda execution completed successfully.'
     }
+

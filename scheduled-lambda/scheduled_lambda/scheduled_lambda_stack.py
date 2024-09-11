@@ -80,8 +80,8 @@ class ScheduledLambdaStack(Stack):
                 tag_or_digest="20231217"
             ),
             role=lambda_role,
-            timeout=cdk.Duration.minutes(5),
-            memory_size=256,
+            timeout=cdk.Duration.minutes(15),
+            memory_size=1024,
             environment={
                 "ENV_VARIABLE_NAME": "value"
             }
@@ -100,7 +100,7 @@ class ScheduledLambdaStack(Stack):
                 "bucket_to_save": "afl-game-data",
                 "data_path": "data/player-gamebygame/AFL-Tables_game-by-game-stats_",
                 "model_path": "models/brownlow_player_single-game/afl_brownlow_player_single-game.onnx",
-                "year_to_query": 2021,
+                "year_to_query": 2024,
                 "region_name": "ap-southeast-2",
                 "table_name": "afl-brownlow-vote-predictions",
                 "projection_expression": "HashKey"
